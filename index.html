@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MK Automation Demo App</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --mk-dark: #2c3e50;
+            --mk-blue: #3498db;
+            --mk-green: #27ae60;
+            --mk-grey: #ecf0f1;
+            --mk-text: #333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f7;
+            color: var(--mk-text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- App Header --- */
+        .app-header {
+            background-color: var(--mk-dark);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .app-header h1 { margin: 0; font-size: 1.2rem; font-weight: 600; }
+        .header-back-btn {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: none; /* Alapból rejtett */
+        }
+
+        /* --- Views (Nézetek) --- */
+        .view-container {
+            flex: 1;
+            display: flex; /* Alapból flex, de JS-sel váltjuk */
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        #scanner-view {
+            align-items: center;
+            justify-content: center;
+        }
+
+        #machine-view {
+            display: none; /* Alapból rejtett */
+        }
+
+        /* --- Scanner Styles --- */
+        #reader {
+            width: 100%;
+            max-width: 400px;
+            border: 2px solid var(--mk-grey);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .scanner-instruction {
+            margin-bottom: 20px;
+            text-align: center;
+            color: #666;
+        }
+
+        /* --- Machine View Styles --- */
+        .status-card {
+            background-color: white;
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            border-left: 5px solid var(--mk-green);
+        }
+        .status-icon { font-size: 1.5rem; margin-right: 10px; color: var(--mk-green); }
+        .status-text h2 { margin: 0; font-size: 1rem; color: var(--mk-green); }
+        .status-text p { margin: 5px 0 0 0; font-size: 0.8rem; color: #888; }
+
+        .action-button {
+            background-color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .action-button:active { transform: scale(0.98); }
+        .btn-icon { font-size: 2rem; margin-right: 20px; }
+        .btn-text { text-align: left; }
+        .btn-text h3 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+        .btn-text p { margin: 5px 0 0 0; color: #888; font-size: 0.9rem; }
+
+        .blue-icon { color: var(--mk-blue); }
+        .orange-icon { color: #e67e22; }
+        
+        .machine-info, .security-footer {
+            font-size: 0.85rem;
+            color: #666;
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+        .security-footer {
+            background: transparent;
+            text-align: center;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Hibakezelés */
+        #qr-error-msg {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header class="app-header">
+        <button class="header-back-btn" id="backBtn" onclick="resetScanner()">←</button>
+        <h1 id="headerTitle">QR Beolvasás</h1>
+    </header>
+
+    <div id="scanner-view" class="view-container">
+        <p class="scanner-instruction">Irányítsa a kamerát a gépen található QR-kódra.</p>
+        
+        <div id="reader"></div>
+        
+        <p id="qr-error-msg"></p>
+        <p style="margin-top: 30px; font-size: 0.8rem; color: #999;">Demo mód: Olvassa be a megfelelő kódot a belépéshez.</p>
+    </div>
+
+
+    <div id="machine-view" class="view-container">
+        
+        <div class="status-card">
+            <div class="status-icon">✅</div>
+            <div class="status-text">
+                <h2>STÁTUSZ: ÜZEMKÉSZ</h2>
+                <p>Utolsó szinkron: Ma, 14:32</p>
+            </div>
+        </div>
+
+        <button class="action-button" onclick="alert('Demo: Itt nyílna meg a PDF.')">
+            <div class="btn-icon blue-icon">📄</div>
+            <div class="btn-text">
+                <h3>Kezelési Útmutató</h3>
+                <p>Verzió: 2.1 (HU)</p>
+            </div>
+        </button>
+
+        <button class="action-button" onclick="alert('Demo: Itt nyílnának meg a rajzok.')">
+            <div class="btn-icon blue-icon">⚡</div>
+            <div class="btn-text">
+                <h3>Kapcsolási Rajzok</h3>
+                <p>E-PLAN hozzáférés szükséges</p>
+            </div>
+        </button>
+
+        <button class="action-button" onclick="alert('Demo: Itt indulna a hibajegy felvétel.')">
+            <div class="btn-icon orange-icon">🔧</div>
+            <div class="btn-text">
+                <h3>Szerviz Bejelentés</h3>
+                <p>Hiba fotózása</p>
+            </div>
+        </button>
+
+        <div class="machine-info">
+            <strong>Gyártási év:</strong> 2025 Q4<br>
+            <strong>Garancia:</strong> 2027.01.15.<br>
+            <strong>Telepítés:</strong> Vevő Kft. – 2. csarnok
+        </div>
+
+        <div class="security-footer">
+            🔒 AES-256 Biztonságos Ipari Kapcsolat
+        </div>
+
+    </div>
+
+
+    <script>
+        // Referenciák a DOM elemekre
+        const scannerView = document.getElementById('scanner-view');
+        const machineView = document.getElementById('machine-view');
+        const headerTitle = document.getElementById('headerTitle');
+        const backBtn = document.getElementById('backBtn');
+        const errorMsg = document.getElementById('qr-error-msg');
+
+        let html5QrcodeScanner;
+
+        // Ez a "TITKOS" kód, amit a QR kódnak tartalmaznia kell a demóhoz.
+        // Bármilyen QR generátorral készíts egy kódot ezzel a szöveggel:
+        const DEMO_QR_CONTENT = "mk-auto://demo-machine-pf500";
+
+
+        function startScanner() {
+            // Inicializáljuk az olvasót
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", 
+                { 
+                    fps: 10, // Képkocka per másodperc
+                    qrbox: { width: 250, height: 250 }, // A szkennelési doboz mérete
+                    aspectRatio: 1.0
+                },
+                /* verbose= */ false
+            );
+            
+            // Elindítjuk a renderelést (bekapcsolja a kamerát)
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+
+
+        // Sikeres olvasáskor lefutó függvény
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log(`Code matched = ${decodedText}`, decodedResult);
+
+            // Ellenőrizzük, hogy a beolvasott kód a mi demó kódunk-e
+            if (decodedText === DEMO_QR_CONTENT) {
+                // SIKER!
+                
+                // 1. Leállítjuk az olvasót és elrejtjük a felületét
+                html5QrcodeScanner.clear().then(_ => {
+                    // 2. Nézet váltása
+                    scannerView.style.display = 'none';
+                    machineView.style.display = 'flex';
+                    
+                    // 3. Fejléc frissítése
+                    headerTitle.textContent = "Gép: MK-PF500";
+                    backBtn.style.display = 'block';
+                    errorMsg.style.display = 'none';
+                }).catch(error => {
+                    console.error("Failed to clear scanner state.", error);
+                });
+
+            } else {
+                // HIBÁS KÓD
+                errorMsg.textContent = "Hiba: Ismeretlen vagy érvénytelen QR-kód.";
+                errorMsg.style.display = 'block';
+                // Pár másodperc múlva eltüntetjük a hibaüzenetet
+                setTimeout(() => { errorMsg.style.display = 'none'; }, 3000);
+            }
+        }
+
+        // Hiba esetén lefutó függvény (opcionális, most csak logolunk)
+        function onScanFailure(error) {
+            // console.warn(`Code scan error = ${error}`);
+        }
+
+        // Vissza gomb funkciója (reseteli a demót)
+        function resetScanner() {
+            machineView.style.display = 'none';
+            scannerView.style.display = 'flex';
+            headerTitle.textContent = "QR Beolvasás";
+            backBtn.style.display = 'none';
+            // Újraindítjuk az olvasót
+            startScanner();
+        }
+
+        // Indításkor azonnal induljon az olvasó
+        // Fontos: Mobilböngészők néha blokkolják, ha nem felhasználói interakció indítja.
+        // Demóhoz ez így OK, de élesben lehet kell egy "Kamera indítása" gomb előtte.
+        document.addEventListener('DOMContentLoaded', (event) => {
+            startScanner();
+        });
+
+    </script>
+</body>
+</html>
